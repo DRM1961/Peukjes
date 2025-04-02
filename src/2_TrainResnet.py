@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 
 USE_RESNET = 34
-REFERENCE_IMAGE_FOLDER = "Images/DataSet"
+REFERENCE_IMAGE_FOLDER = "../Images/DataSet"
 
 feature_extractor = None
 fnscaler = ''
@@ -106,22 +106,22 @@ def get_good_bad_images(class_dir):
 
 if USE_RESNET == 50:
     feature_extractor = FeatureExtractor50()
-    fnscaler = 'Data/scaler_50.pkl'
-    fnallfeatures = 'Data/all_features_50.npy'
-    fnalllabels = 'Data/all_labels_50.npy'
-    fnmodel = 'Data/mlp_model_50.pth'
+    fnscaler = '../Data/scaler_50.pkl'
+    fnallfeatures = '../Data/all_features_50.npy'
+    fnalllabels = '../Data/all_labels_50.npy'
+    fnmodel = '../Data/mlp_model_50.pth'
 elif USE_RESNET == 34:
     feature_extractor = FeatureExtractor34()
-    fnscaler = 'Data/scaler_34.pkl'
-    fnallfeatures = 'Data/all_features_34.npy'
-    fnalllabels = 'Data/all_labels_34.npy'
-    fnmodel = 'Data/mlp_model_34.pth'
+    fnscaler = '../Data/scaler_34.pkl'
+    fnallfeatures = '../Data/all_features_34.npy'
+    fnalllabels = '../Data/all_labels_34.npy'
+    fnmodel = '../Data/mlp_model_34.pth'
 elif USE_RESNET == 18:
     feature_extractor = FeatureExtractor18()
-    fnscaler = 'Data/scaler_18.pkl'
-    fnallfeatures = 'Data/all_features_18.npy'
-    fnalllabels = 'Data/all_labels_18.npy'
-    fnmodel = 'Data/mlp_model_18.pth'
+    fnscaler = '../Data/scaler_18.pkl'
+    fnallfeatures = '../Data/all_features_18.npy'
+    fnalllabels = '../Data/all_labels_18.npy'
+    fnmodel = '../Data/mlp_model_18.pth'
 else:
     print(f"error: Resnet{USE_RESNET} not defined")
     exit
