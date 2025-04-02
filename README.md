@@ -1,6 +1,7 @@
 # Peukjes
 
-Folders and content
+* Folders and content
+
 Peukjes |---- Data => contains a scaler and the NN model for runtime testing
         |---- Debug => contains csv file with performance data on datasets
         |---- Images 
@@ -11,7 +12,7 @@ Peukjes |---- Data => contains a scaler and the NN model for runtime testing
         |           |---- Peukjes     => original training images of peukjes in a cup 
         |---- src  => sourcecode
               
-Programs
+* Programs
 1_CreateDataset.py 
 Performs basic augmentation on a series of original GOOD/BAD images.
 Using an "empty" scene as reference:
