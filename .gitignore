@@ -1,0 +1,7 @@
+_avast_/*
+src_train_test/_avast_/*
+src_train_test/__pycache__/*
+src_runtime/_avast_/*
+src_runtime/__pycache__/*
+
+
