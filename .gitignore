@@ -3,5 +3,11 @@ src_train_test/_avast_/*
 src_train_test/__pycache__/*
 src_runtime/_avast_/*
 src_runtime/__pycache__/*
+src_runtime_async/_avast_/*
+src_runtime_async/__pycache__/*
+Images/Dataset/*.png
+Images/Runtime/*.png
+Debug/*.png
+
 
 
