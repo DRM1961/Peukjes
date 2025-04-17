@@ -13,6 +13,7 @@ from common_vision import ProfileFeature
 from common_vision import InitCamera, ReadInputImage, MakeHorizontalProfile, MakeVerticalProfile
 from PIL import Image
 
+from picamera2 import Picamera2
 import cv2
 
 import joblib
@@ -105,19 +106,20 @@ def process_image(frame, feature_extractor, scaler, model):
 
     return(obj_is_good, good_score, bad_score)
 
-def main(cam):
-    if cam.isOpened():
-        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
-        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
+def main(cam, cameratype):
+    if cameratype != 'picamera2':
+        if cam.isOpened():
+            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
+            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
 
-        cam.set(cv2.CAP_PROP_BRIGHTNESS, 0)
-    else:
-        print(f'cannot open camera {CAMID}')
-        return()
+            cam.set(cv2.CAP_PROP_BRIGHTNESS, 0)
+        else:
+            print(f'cannot open camera {CAMID}')
+            return()
 
-    cam_w = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-    cam_h = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    print(cam_w, cam_h)
+        cam_w = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        cam_h = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(cam_w, cam_h)
 
 
     #init nnmodel
@@ -152,12 +154,23 @@ def main(cam):
     ref_ravg, ref_rmin, ref_rmax, ref_cavg, ref_cmin, ref_cmax = get_image_profiles(empty, direction=0x03)
     mean_ref_cavg = np.mean(ref_cavg)
 
+    cv2.namedWindow('img', cv2.WINDOW_NORMAL)
 
     print('check position of cup below the camera; press ESC to exit and start processing real images')
+    focussed = False
     while True:
-        ret, frame = cam.read()
-        if not ret:
-            break
+        if cameratype != 'picamera2':
+            ret, frame = cam.read()
+            if not ret:
+                break
+        else:
+            if not focussed:
+                try:
+                    cam.autofocus_cycle()
+                except:
+                    print("Autofocus not available - using fixed focus")
+                focussed = True
+            frame = cam.capture_array()
 
         cv2.imshow('img', frame)
         # Press ESC to exit the loop
@@ -167,13 +180,15 @@ def main(cam):
         if cv2.getWindowProperty('img', 1) < 0:
             break
 
-
     print('starting the main loop: press ESC to exit')
     prev_np_mean_diff = 0
     while True:
-        ret, frame = cam.read()
-        if not ret:
-            break
+        if cameratype != 'picamera2':
+            ret, frame = cam.read()
+            if not ret:
+                break
+        else:
+            frame = cam.capture_array()
 
         cv2.imshow('img', frame)
         # Press ESC to exit the loop
@@ -193,44 +208,92 @@ def main(cam):
         if abs(prev_np_mean_diff - np_mean_diff) > 2:
             print(f'diff of mean = {int(np_mean_diff)}')
             prev_np_mean_diff = np_mean_diff
+
         if abs(np_mean_diff) > 10:
             for i in range(10):  #read buffered frames debounce
-                ret, frame = cam.read()
+                if cameratype != 'picamera2':
+                    _, frame = cam.read()
+                else:
+                    frame = cam.capture_array()
+
                 cv2.imshow('img', frame)
 
             is_good, val_good, val_bad = process_image(frame, feature_extractor, scaler, model)
 
             print(f'is good: {is_good}, scores ({val_good}, {val_bad}')
-            fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}.jpg'
+            fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}.png'
             fn = fn.replace(":", "-")
             cv2.imwrite(fn, frame)
 
-            print("press 'c' to continue, 'c' followed by ESC to quit")
-            if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
-                continue
+            #print("press 'c' to continue, 'c' followed by ESC to quit")
+            #if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
+            #    continue
 
             for i in range(30):  #read buffered frames
-                ret, frame = cam.read()
+                if cameratype != 'picamera2':
+                    _, frame = cam.read()
+                else:
+                    frame = cam.capture_array()
                 cv2.imshow('img', frame)
 
     #cam.set(cv2.CAP_PROP_POS_FRAMES, cam.get(cv2.CAP_PROP_POS_FRAMES))  # Pause stream
 
+def init_camera():
+    img_format = 'png'
+    resolution = [1920, 1080]
+    sharpness = 2.0
+
+    cam = Picamera2()
+    
+    # Configure for higher quality with anti-blur settings
+    config = cam.create_still_configuration(
+        main={"size": resolution},
+        controls={
+            "AwbEnable": True,
+            "AeEnable": True,
+            "AnalogueGain": 1.0,
+            "Sharpness": sharpness,
+            "ExposureTime": 10000,  # microseconds (helps reduce motion blur)
+        }
+    )
+    cam.configure(config)
+        
+    print("Starting camera...")
+    cam.start()
+
+    return cam
+
+    
+
+
+    pass
 
 if __name__ == '__main__':
-    CAMID = 1 #0 = internal cam, 1..n = external
-              # for external cameras, camid nr doesn't work on ubuntu on rpi, must use /dev/video
-              # use: 'lsusb' to check if camera is listed
-              # use: 'v4l2-ctl' to get camera connection overview
-              # sudo apt-get install v4l-utils
-              # v4l2-ctl --list-devices
+    cameratype = 'picamera2'
 
-    print('init camera, this takes a while')
-    if os.name=='nt':
-        cam = cv2.VideoCapture(CAMID)
+    if cameratype != 'picamera2':
+        # use opencv camera
+        # check if camera is available
+        # check if camera is available
+        # CAMID = 0 #0 = internal cam, 1..n = external
+        CAMID = 1 #0 = internal cam, 1..n = external
+                # for external cameras, camid nr doesn't work on ubuntu on rpi, must use /dev/video
+                # use: 'lsusb' to check if camera is listed
+                # use: 'v4l2-ctl' to get camera connection overview
+                # sudo apt-get install v4l-utils
+                # v4l2-ctl --list-devices
+
+        print('init camera, this takes a while')
+
+        if os.name=='nt':
+            cam = cv2.VideoCapture(CAMID)
+        else:
+            cam = cv2.VideoCapture('/dev/video0')
     else:
-        cam = cv2.VideoCapture('/dev/video0')
-    main(cam)
+        cam = init_camera()
+
+    main(cam, cameratype)
 
     # Release the capture and writer objects
     cv2.destroyAllWindows()
-    cam.release()
+    #cam.release()

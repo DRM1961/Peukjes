@@ -8,6 +8,8 @@ src_runtime_async/__pycache__/*
 Images/Dataset/*.png
 Images/Runtime/*.png
 Debug/*.png
+Debug/*.jpg
+ProcessedImages/*.*
 
 
 
