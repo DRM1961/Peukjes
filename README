@@ -23,6 +23,10 @@ sudo apt install python3-torchvision
 sudo apt install python3-seaborn
 sudo apt install python3-opencv-python
 sudo apt install python3-numpy
+sudo apt install python3-lgpio
+
+https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi
+https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/using-neopixels-on-the-pi-5
 
 1_CreateDataset.py
 Performs basic augmentation on a series of original GOOD/BAD images.

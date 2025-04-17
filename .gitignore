@@ -10,6 +10,6 @@ Images/Runtime/*.png
 Debug/*.png
 Debug/*.jpg
 ProcessedImages/*.*
-
+env/*
 
 

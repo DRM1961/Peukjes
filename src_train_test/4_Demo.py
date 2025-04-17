@@ -11,6 +11,7 @@ import torch
 from common import FeatureExtractor18, FeatureExtractor34, FeatureExtractor50,MLPClassifier, transform
 from common_vision import ProfileFeature
 from common_vision import InitCamera, ReadInputImage, MakeHorizontalProfile, MakeVerticalProfile
+from cam_illum import set_illum_white, flash_illum, init_camera
 from PIL import Image
 
 from picamera2 import Picamera2
@@ -149,14 +150,12 @@ def main(cam, cameratype):
     model.eval()
     print("Model loaded successfully and ready for inference!")
 
-    #init empty image for runtime detection of object present or not
-    empty,_,_,_,_ = ReadInputImage('../Images/empty.png')
-    ref_ravg, ref_rmin, ref_rmax, ref_cavg, ref_cmin, ref_cmax = get_image_profiles(empty, direction=0x03)
-    mean_ref_cavg = np.mean(ref_cavg)
-
     cv2.namedWindow('img', cv2.WINDOW_NORMAL)
 
     print('check position of cup below the camera; press ESC to exit and start processing real images')
+    
+    brightness = 0.3
+    set_illum_white(brightness)
     focussed = False
     while True:
         if cameratype != 'picamera2':
@@ -179,6 +178,13 @@ def main(cam, cameratype):
 
         if cv2.getWindowProperty('img', 1) < 0:
             break
+
+    #init empty image for runtime detection of object present or not
+    cv2.imwrite('../Images/empty.png', frame)
+    empty,_,_,_,_ = ReadInputImage('../Images/empty.png')
+    ref_ravg, ref_rmin, ref_rmax, ref_cavg, ref_cmin, ref_cmax = get_image_profiles(empty, direction=0x03)
+    mean_ref_cavg = np.mean(ref_cavg)
+    mean_ref_ravg = np.mean(ref_ravg)
 
     print('starting the main loop: press ESC to exit')
     prev_np_mean_diff = 0
@@ -203,13 +209,14 @@ def main(cam, cameratype):
 
         ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(img, direction=0x03)
         mean_cavg = np.mean(cavg)
+        mean_ravg = np.mean(ravg)
 
-        np_mean_diff = int(mean_ref_cavg - mean_cavg)
+        np_mean_diff = max(int(mean_ref_cavg - mean_cavg), int(mean_ref_ravg-mean_ravg))
         if abs(prev_np_mean_diff - np_mean_diff) > 2:
             print(f'diff of mean = {int(np_mean_diff)}')
             prev_np_mean_diff = np_mean_diff
 
-        if abs(np_mean_diff) > 10:
+        if abs(np_mean_diff) > 40:
             for i in range(10):  #read buffered frames debounce
                 if cameratype != 'picamera2':
                     _, frame = cam.read()
@@ -225,6 +232,12 @@ def main(cam, cameratype):
             fn = fn.replace(":", "-")
             cv2.imwrite(fn, frame)
 
+            if is_good:
+                flash_illum('green', 2)
+            else:
+                flash_illum('red', 2)
+            set_illum_white(brightness)
+
             #print("press 'c' to continue, 'c' followed by ESC to quit")
             #if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
             #    continue
@@ -238,37 +251,13 @@ def main(cam, cameratype):
 
     #cam.set(cv2.CAP_PROP_POS_FRAMES, cam.get(cv2.CAP_PROP_POS_FRAMES))  # Pause stream
 
-def init_camera():
-    img_format = 'png'
-    resolution = [1920, 1080]
-    sharpness = 2.0
-
-    cam = Picamera2()
-    
-    # Configure for higher quality with anti-blur settings
-    config = cam.create_still_configuration(
-        main={"size": resolution},
-        controls={
-            "AwbEnable": True,
-            "AeEnable": True,
-            "AnalogueGain": 1.0,
-            "Sharpness": sharpness,
-            "ExposureTime": 10000,  # microseconds (helps reduce motion blur)
-        }
-    )
-    cam.configure(config)
-        
-    print("Starting camera...")
-    cam.start()
-
-    return cam
-
-    
-
-
-    pass
 
 if __name__ == '__main__':
+    cwd = os.getcwd()
+    print(cwd)
+    if 'src_train_test' not in cwd:
+        os.chdir('src_train_test')
+
     cameratype = 'picamera2'
 
     if cameratype != 'picamera2':
@@ -296,4 +285,5 @@ if __name__ == '__main__':
 
     # Release the capture and writer objects
     cv2.destroyAllWindows()
+    set_illum_white(0.0)
     #cam.release()
