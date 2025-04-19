@@ -31,11 +31,15 @@ else:
     maxduty = 12.0
     midduty = (maxduty+minduty)/2
 
-def InitServo(pin):
+def InitServo(pin, config_min_duty=2.0, config_max_duty=12.0):
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(pin, GPIO.OUT)
     pwm = GPIO.PWM(pin, freq)
     pwm.start(0)
+
+    minduty = config_min_duty
+    maxduty = config_max_duty
+    midduty = (maxduty+minduty)/2
     sleep(1)
     SetAngle(pwm, pin, 90)   
     return pwm
