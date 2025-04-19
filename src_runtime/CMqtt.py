@@ -10,7 +10,7 @@ import time
 import cv2
 import os
 
-broker_IP="172.21.235.58"
+broker_IP="172.21.235.38"
 #broker_IP="192.168.129.82"
 
 port = 1883
