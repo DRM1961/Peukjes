@@ -15,6 +15,9 @@ from time import sleep   # Imports sleep (aka wait or pause) into the program
 pin = 5
 last_angle = 0
 freq = 50
+minduty = 2.0
+maxduty = 12.0
+midduty = (maxduty+minduty)/2
 #see observations in LIMIT_ANGLE_FINE to see how I got these values
 if freq==50:
     minduty = 2.0
@@ -32,6 +35,7 @@ else:
     midduty = (maxduty+minduty)/2
 
 def InitServo(pin, config_min_duty=2.0, config_max_duty=12.0):
+    global minduty, maxduty, midduty
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(pin, GPIO.OUT)
     pwm = GPIO.PWM(pin, freq)
@@ -40,15 +44,16 @@ def InitServo(pin, config_min_duty=2.0, config_max_duty=12.0):
     minduty = config_min_duty
     maxduty = config_max_duty
     midduty = (maxduty+minduty)/2
+    sleep(2)
+    SetAngle(pwm, pin, 0)   
     sleep(1)
-    SetAngle(pwm, pin, 90)   
     return pwm
 
 def SetAngle(pwm, pin, angle):
 	duty = angle * (maxduty-minduty)/180 + minduty
 	GPIO.output(pin, True)
 	pwm.ChangeDutyCycle(duty)
-	sleep(1)
+	sleep(1.0)
 	GPIO.output(pin, False)
 	pwm.ChangeDutyCycle(0)
 
@@ -66,11 +71,12 @@ def SwitchAngle(pwm, pin):
     else:
         last_angle = 0
     SetAngle(pwm, pin, last_angle)
+    print(f'new angle = {last_angle}')
 
 
 if __name__ == "__main__":
     tests = ["LIMIT_CHECK", "LIMIT_ANGLE_FINE", "DUTY_CHECK", "SWITCH_ANGLE", "SERVO", "ANGULAR_SERVO"]
-    test = tests[2]
+    test = tests[0]
 
     if test=="LIMIT_CHECK":    
         pwm = InitServo(pin)

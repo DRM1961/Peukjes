@@ -26,23 +26,23 @@ from datetime import datetime
 from time import sleep
 
 USED_RESNET = 34
-feature_extractor = None
-fnscaler = ''
-fnmodel = ''
+#feature_extractor = None
+#fnscaler = ''
+#fnmodel = ''
 
 mycounter = 1 # or 2
 counter = 0
 
 headless = False
 
-brightness_autofocus = 0.3
-brightness_detect = 0.3
-brightness_measure = 0.3
+brightness_autofocus = 0.1
+brightness_detect = 0.1
+brightness_measure = 0.1
 
-servo_min_duty = 0.3
-servo_max_duty = 10.0 
+servo_min_duty = 2.2
+servo_max_duty = 9.5
 
-min_mean_difference = 40
+min_mean_difference = 10
 
 def UpdateMQTT(is_good, frame):
     global counter
@@ -132,7 +132,7 @@ def init_NNmodel():
     model.eval()
     print("Model loaded successfully and ready for inference!")
 
-    return(feature_extactor, scaler, model)
+    return(feature_extractor, scaler, model)
 
 def process_image(frame, feature_extractor, scaler, model):
     image = Image.fromarray(frame)
@@ -168,10 +168,10 @@ def get_image_profile_features(frame):
     #cv2.imwrite('../Images/empty.png', frame)
     #frame,_,_,_,_ = ReadInputImage('../Images/empty.png')
 
-    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(frame, direction=0x03)
+    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(frame, direction=0x03, show=False)
     return(np.mean(ravg), np.mean(cavg))
 
-def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
+def app(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
     global brightness_autofocus, brightness_detect, brightness_measure
     print('check position of cup below the camera; press ESC to exit and start processing real images')
 
@@ -186,10 +186,12 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
             if not focussed:
                 try:
                     cam.autofocus_cycle()
+                    print("Autofocus finished")
                 except:
                     print("Autofocus not available - using fixed focus")
                 focussed = True
             frame = cam.capture_array()
+            #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         
         if not headless:
             cv2.imshow('img', frame)
@@ -205,7 +207,6 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
     print('starting the main loop: press ESC to exit')
     prev_np_mean_diff = 0
 
-
     while True:
         if cameratype != 'picamera2':
             ret, frame = cam.read()
@@ -213,6 +214,7 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
                 break
         else:
             frame = cam.capture_array()
+            #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         if not headless:
             cv2.imshow('img', frame)
@@ -223,7 +225,7 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
 		
         #get features from image to see if something is present
         mean_ravg, mean_cavg = get_image_profile_features(frame)
-        np_mean_diff = max(int(mean_ref_cavg - mean_cavg), int(mean_ref_ravg-mean_ravg))
+        np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
         if abs(prev_np_mean_diff - np_mean_diff) > 2:
             print(f'diff of mean = {int(np_mean_diff)}')
             prev_np_mean_diff = np_mean_diff
@@ -235,6 +237,7 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
                     _, frame = cam.read()
                 else:
                     frame = cam.capture_array()
+                    #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             if not headless:
                 cv2.imshow('img', frame)
@@ -255,6 +258,7 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
 
             if pwm:
                 SwitchAngle(pwm, iopin)
+                sleep(1)
 
             if not pwm:
                 print("press 'c' to continue")
@@ -267,6 +271,7 @@ def main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
                     _, frame = cam.read()
                 else:
                     frame = cam.capture_array()
+                    #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 if not headless:
                     cv2.imshow('img', frame)
 
@@ -317,20 +322,22 @@ if __name__ == '__main__':
     iopin = 5
     pwm = InitServo(iopin, servo_min_duty, servo_max_duty)
     SwitchAngle(pwm, iopin)
+    sleep(2)
+    SwitchAngle(pwm, iopin)
 
     #init mqtt
     mqtt = CMqttClient(userdata="rpi6", user="rpi6", pw="client")
     mqtt.subscribe(f"set_counter/{mycounter}")
 
     #init nnmodel
-    feature_extactor, scaler, model = init_NNmodel()
+    feature_extractor, scaler, model = init_NNmodel()
 
     #init display
     if not headless:	
         cv2.namedWindow('img', cv2.WINDOW_NORMAL)
 
 
-    main(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model)
+    app(cam, cameratype, pwm, mqtt, feature_extractor, scaler, model)
 
     # Release the capture and writer objects
     if not headless:
@@ -339,5 +346,7 @@ if __name__ == '__main__':
     set_illum_white(0.0)
     #cam.release()
 	
-    pwm.stop() 
+    SwitchAngle(pwm, iopin)
+    sleep(2)
+    #pwm.stop() 
 

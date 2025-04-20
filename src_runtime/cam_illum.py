@@ -61,7 +61,7 @@ def flash_illum(color, flashtime):
         if int(now*10)%2:
             brightness = 0.0
         else:
-            brightness = 1.0
+            brightness = 0.5
 
         if color=='green':
             set_illum_green(brightness)
@@ -81,8 +81,8 @@ def init_camera():
     
     # Configure for higher quality with anti-blur settings
     config = cam.create_still_configuration(
-        main={"size": resolution},
-        controls={
+        main={"size": resolution, "format": "RGB888"},
+        controls={          
             "AwbEnable": True,
             "AeEnable": True,
             "AnalogueGain": 1.0,
@@ -133,10 +133,12 @@ if __name__ == '__main__':
                 flash_illum('red', 0.5)
             elif teststage==5:
                 set_illum_white(brightness)
+            elif teststage==6:
+                flash_illum('white', 0.5)
             elif teststage>6:
                 set_illum_white(0)
                 break
-
+        
         if not focussed:
             try:
                 cam.autofocus_cycle()
@@ -155,4 +157,5 @@ if __name__ == '__main__':
 
 
     set_illum_white(0.0)
+    time.sleep(2)
 
