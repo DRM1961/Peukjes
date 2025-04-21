@@ -10,14 +10,14 @@ import time
 import cv2
 import os
 
-broker_IP="172.21.235.33"
+broker_IP="172.21.235.33" 
 #broker_IP="192.168.129.82"
 
 port = 1883
 keepalive = 60
 
 class CMqttClient:
-    def __init__(self, userdata, user, pw):
+    def __init__(self, userdata, user, pw, broker):
         self.counter = [0,0]
         self.user = user
         self.pw = pw
@@ -33,7 +33,7 @@ class CMqttClient:
             self.client = mqtt.Client()  
             self.client.username_pw_set(username=self.user,password=self.pw)
             self.client.on_connect = self.on_connect
-            self.client.connect(broker_IP, port, keepalive) 
+            self.client.connect(broker, port, keepalive) 
             self.client.loop_start() #loop_forever?
         except Exception as e:
             print(f"Error: {e}")
@@ -105,7 +105,7 @@ class CMqttClient:
 
 
 if __name__ == "__main__":
-    mqtt = CMqttClient(userdata="dm", user="rpi6", pw="client")
+    mqtt = CMqttClient(userdata="dm", user="rpi6", pw="client", broker_IP)
     mycounter = 1
     count = mqtt.increment_counter(mycounter)
     count = 5

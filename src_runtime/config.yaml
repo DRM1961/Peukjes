@@ -1,0 +1,18 @@
+mycounter: 1
+headless: False
+mqtt:
+  broker: 172.21.235.37
+  port: 1883
+  pw: client
+  user: rpi6
+servo:
+  iopin: 5
+  min_duty: 2.2
+  max_duty: 9.5
+illum:
+  brightness_autofocus: 0.1
+  brightness_detect: 0.1
+  brightness_measure: 0.1
+  flashtime: 1.0
+detection:
+  min_mean_difference: 10.0
