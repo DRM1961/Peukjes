@@ -171,13 +171,21 @@ def process_image(frame, feature_extractor, scaler, model):
     return(obj_is_good, good_score, bad_score)
 
 def get_image_profile_features(frame):
-    if len(frame.shape) == 3:  # if not gray already
+    if len(frame.shape) > 1:  # if not gray already
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+    #crop image to ROI
+    h,w = frame.shape
+    y_start = 0
+    y_end = h-1
+    x_start = y_start
+    x_end = y_end
+ 
+    cropped = frame[y_start:y_end, x_start:x_end]
+ 
     #cv2.imwrite('../Images/empty.png', frame)
     #frame,_,_,_,_ = ReadInputImage('../Images/empty.png')
-
-    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(frame, direction=0x03, show=False)
+    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(cropped, direction=0x03, show=False)
     return(np.mean(ravg), np.mean(cavg))
 
 def app(cam, servo, mqtt, feature_extactor, scaler, model):
@@ -185,27 +193,26 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
     print('check position of cup below the camera; press ESC to exit and start processing real images')
 
     set_illum_white(brightness_autofocus)
-    focussed = False
-    while True:
-        if not focussed:
-            try:
-                cam.autofocus_cycle()
-                print("Autofocus finished")
-            except:
-                print("Autofocus not available - using fixed focus")
-            focussed = True
-        frame = cam.capture_array()
-        
-        if not headless:
-            cv2.imshow('img', frame)
-            # Press ESC to exit the loop
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
+    try:
+        cam.autofocus_cycle()
+        print("Autofocus finished")
+    except:
+        print("Autofocus not available - using fixed focus")
+    focussed = True
+    frame = cam.capture_array()
+
+    if not headless:
+        cv2.imshow('img', frame)
+        print("press ESC to continue")
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
 
     #init empty image for detection of object present or not
     mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
-    print('starting the main loop: press ESC to exit')
     prev_np_mean_diff = 0
+
+    if not headless:
+        print('starting the main loop: press ESC to exit')
 
     while True:
         UpdateMQTTState(MQTT_STATE_IDLE)
@@ -250,9 +257,10 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 SwitchAngle(servo, servo_iopin)
                 sleep(1)
             else:
-                print("press 'c' to continue")
-                if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
-                    continue
+                if not headless:
+                    print("press 'c' to continue")
+                    if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
+                        continue
 
             set_illum_white(brightness_detect)
             for i in range(30):  #read buffered frames

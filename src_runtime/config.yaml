@@ -1,7 +1,7 @@
 mycounter: 1
 headless: False
 mqtt:
-  broker: 172.21.235.33
+  broker: 172.21.235.37
   port: 1883
   pw: client
   user: rpi6
