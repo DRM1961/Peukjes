@@ -39,6 +39,7 @@ brightness_autofocus = 0.1
 brightness_detect = 0.1
 brightness_measure = 0.1
 
+servo_iopin = 5
 servo_min_duty = 2.2
 servo_max_duty = 9.5
 
@@ -257,7 +258,7 @@ def app(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
             UpdateMQTT(is_good, frame)
 
             if pwm:
-                SwitchAngle(pwm, iopin)
+                SwitchAngle(pwm, servo_iopin)
                 sleep(1)
 
             if not pwm:
@@ -319,11 +320,10 @@ if __name__ == '__main__':
         cam = init_camera()
 
     #init servo
-    iopin = 5
-    pwm = InitServo(iopin, servo_min_duty, servo_max_duty)
-    SwitchAngle(pwm, iopin)
+    pwm = InitServo(servo_iopin, servo_min_duty, servo_max_duty)
+    SwitchAngle(pwm, servo_iopin)
     sleep(2)
-    SwitchAngle(pwm, iopin)
+    SwitchAngle(pwm, servo_iopin)
 
     #init mqtt
     mqtt = CMqttClient(userdata="rpi6", user="rpi6", pw="client")
@@ -346,7 +346,7 @@ if __name__ == '__main__':
     set_illum_white(0.0)
     #cam.release()
 	
-    SwitchAngle(pwm, iopin)
+    SwitchAngle(pwm, servo_iopin)
     sleep(2)
     #pwm.stop() 
 

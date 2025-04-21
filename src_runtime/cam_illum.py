@@ -2,6 +2,7 @@ import time
 import board
 from adafruit_raspberry_pi5_neopixel_write import neopixel_write
 from picamera2 import Picamera2
+from libcamera import controls
 import cv2
 
 # Configuration
@@ -75,6 +76,8 @@ def flash_illum(color, flashtime):
 def init_camera():
     img_format = 'png'
     resolution = [1920, 1080]
+    #resolution = [1536, 864]
+    scaler_crop = (768, 432, 1728, 1728)
     sharpness = 2.0
 
     cam = Picamera2()
@@ -83,14 +86,22 @@ def init_camera():
     config = cam.create_still_configuration(
         main={"size": resolution, "format": "RGB888"},
         controls={          
-            "AwbEnable": True,
-            "AeEnable": True,
+            "AwbEnable": False,
+            "AeEnable": False,
             "AnalogueGain": 1.0,
             "Sharpness": sharpness,
             "ExposureTime": 10000,  # microseconds (helps reduce motion blur)
+            #"AfMode": controls.AfModeEnum.Manual,
+            #"LensPosition": 10.0,
+            #"ScalerCrop": scaler_crop
+
         }
     )
     cam.configure(config)
+    print(cam.camera_ctrl_info.keys())
+    print(cam.sensor_modes)
+    #cam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 10.0})
+    #cam.set_controls({"ScalerCrop": scaler_crop})
         
     print("Starting camera...")
     cam.start()
@@ -111,11 +122,21 @@ if __name__ == '__main__':
     brightness = 0.0
     teststage = 0
     starttime = time.time()
-    endtime = time.time() + 2
+    endtime = time.time() + 1
     while True:
+        if not focussed:
+            try:
+                set_illum_white(0.1)
+                cam.autofocus_cycle()
+                print("Autotfocus done")
+                set_illum_white(0.0)
+            except:
+                print("Autofocus not available - using fixed focus")
+            focussed = True
+
         now = time.time()
         if now > endtime:
-            if brightness >= 1.0:
+            if brightness >= 0.7:
                 brightness = 0.0
                 teststage += 1
                 continue
@@ -136,15 +157,11 @@ if __name__ == '__main__':
             elif teststage==6:
                 flash_illum('white', 0.5)
             elif teststage>6:
-                set_illum_white(0)
+                set_illum_white(0.1)
                 break
         
-        if not focussed:
-            try:
-                cam.autofocus_cycle()
-            except:
-                print("Autofocus not available - using fixed focus")
-            focussed = True
+        
+        
         frame = cam.capture_array()
 
         cv2.imshow('img', frame)
@@ -155,7 +172,14 @@ if __name__ == '__main__':
         if cv2.getWindowProperty('img', 1) < 0:
             break
 
+    print(frame.shape)
+    set_illum_white(0.1)
+    time.sleep(2)
+    while True:
+        frame = cam.capture_array()
+
+        cv2.imshow('img', frame)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
 
     set_illum_white(0.0)
-    time.sleep(2)
-
