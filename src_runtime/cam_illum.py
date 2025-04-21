@@ -76,8 +76,6 @@ def flash_illum(color, flashtime):
 def init_camera():
     img_format = 'png'
     resolution = [1920, 1080]
-    #resolution = [1536, 864]
-    scaler_crop = (768, 432, 1728, 1728)
     sharpness = 2.0
 
     cam = Picamera2()
@@ -91,10 +89,6 @@ def init_camera():
             "AnalogueGain": 1.0,
             "Sharpness": sharpness,
             "ExposureTime": 10000,  # microseconds (helps reduce motion blur)
-            #"AfMode": controls.AfModeEnum.Manual,
-            #"LensPosition": 10.0,
-            #"ScalerCrop": scaler_crop
-
         }
     )
     cam.configure(config)

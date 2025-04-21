@@ -15,4 +15,4 @@ illum:
   brightness_measure: 0.1
   flashtime: 1.0
 detection:
-  min_mean_difference: 10.0
+  min_mean_difference: 5.0
