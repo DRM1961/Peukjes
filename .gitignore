@@ -9,6 +9,7 @@ Images/Dataset/*.png
 Images/Runtime/*.png
 Debug/*.png
 Debug/*.jpg
+Debug/*.csv
 ProcessedImages/*.*
 env/*
 
