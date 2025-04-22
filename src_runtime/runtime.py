@@ -56,7 +56,7 @@ def UpdateMQTTCounter(is_good, frame):
     if is_good:
         counter = mqttclient.increment_counter(mycounter)
         with open("../Debug/counter.txt", "w") as f:
-            f.write(counter)
+            f.write(str(counter))
 
     if mqttclient.connected:
         mqttclient.publish(f"counter/{mycounter}", str(counter))
@@ -287,7 +287,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
 
 
 if __name__ == '__main__':
-    global mycounter, headless
+    global mycounter, headless, counter
     global brightness_autofocus, brightness_detect, brightness_measure, flashtime
     global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference
 
