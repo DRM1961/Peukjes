@@ -28,7 +28,12 @@ from time import sleep
 from CConfig import CConfig
 
 USED_RESNET = 34
+MQTT_STATE_IDLE = 0
+MQTT_STATE_ANALYZE = 1
+MQTT_STATE_POSITIVE = 2
+MQTT_STATE_NEGATIVE = 3
 
+'''
 mycounter = 1 # or 2
 counter = 0
 
@@ -44,26 +49,30 @@ servo_min_duty = 2.2
 servo_max_duty = 9.5
 
 min_mean_difference = 10
+'''
 
 def UpdateMQTTCounter(is_good, frame):
     global counter
     if is_good:
-        counter = mqtt.increment_counter(mycounter)
-    if mqtt.connected:
-        mqtt.publish(f"counter/{mycounter}", str(counter))
+        counter = mqttclient.increment_counter(mycounter)
+        with open("../Debug/counter.txt", "w") as f:
+            f.write(counter)
+
+    if mqttclient.connected:
+        mqttclient.publish(f"counter/{mycounter}", str(counter))
         #mqtt.publish(f"image/{mycounter}", frame, isImage=True)
         print(f"publishing counter {mycounter}: counter {counter}")
     else:
         print(f"NOT publishing counter {mycounter}: counter {counter}")
-        mqtt.publish_via_cmd(f"counter/{mycounter}", str(counter))
+        mqttclient.publish_via_cmd(f"counter/{mycounter}", str(counter))
 
 def UpdateMQTTState(state):
-    if mqtt.connected:
-        mqtt.publish(f"state/{mycounter}", str(state))
+    if mqttclient.connected:
+        mqttclient.publish(f"state/{mycounter}", str(state))
         print(f"publishing state {mycounter}: state {state}")
     else:
         print(f"NOT publishing state {mycounter}: state {state}")
-        mqtt.publish_via_cmd(f"state/{mycounter}", str(state))
+        mqttclient.publish_via_cmd(f"state/{mycounter}", str(state))
 
 def get_image_profiles(img, direction=3, show=False):
     hbase, wbase = img.shape[:2]
@@ -170,7 +179,7 @@ def process_image(frame, feature_extractor, scaler, model):
 
     return(obj_is_good, good_score, bad_score)
 
-def get_image_profile_features(frame):
+def get_image_profile_features(frame, saveframe=False):
     if len(frame.shape) > 1:  # if not gray already
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -183,14 +192,16 @@ def get_image_profile_features(frame):
  
     cropped = frame[y_start:y_end, x_start:x_end]
  
-    #cv2.imwrite('../Images/empty.png', frame)
-    #frame,_,_,_,_ = ReadInputImage('../Images/empty.png')
+    if saveframe:
+        cv2.imwrite('../Images/empty_orig.png', frame)
+        cv2.imwrite('../Images/empty_cropped.png', cropped)
     ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(cropped, direction=0x03, show=False)
     return(np.mean(ravg), np.mean(cavg))
 
 def app(cam, servo, mqtt, feature_extactor, scaler, model):
-    global brightness_autofocus, brightness_detect, brightness_measure
-    print('check position of cup below the camera; press ESC to exit and start processing real images')
+    global mycounter, headless
+    global brightness_autofocus, brightness_detect, brightness_measure, flashtime
+    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference
 
     set_illum_white(brightness_autofocus)
     try:
@@ -200,22 +211,21 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
         print("Autofocus not available - using fixed focus")
     focussed = True
     frame = cam.capture_array()
+    print(f'frame shape = {frame.shape}')
 
     if not headless:
         cv2.imshow('img', frame)
-        print("press ESC to continue")
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
 
     #init empty image for detection of object present or not
-    mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
+    mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame, saveframe=True)
     prev_np_mean_diff = 0
 
     if not headless:
         print('starting the main loop: press ESC to exit')
 
+    UpdateMQTTState(MQTT_STATE_IDLE)
+
     while True:
-        UpdateMQTTState(MQTT_STATE_IDLE)
         frame = cam.capture_array()
         if not headless:
             cv2.imshow('img', frame)
@@ -236,6 +246,8 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 frame = cam.capture_array()
                 if not headless:
                     cv2.imshow('img', frame)
+
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
             is_good, val_good, val_bad = process_image(frame, feature_extractor, scaler, model)
 
@@ -271,6 +283,9 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
             #update reference features
             mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
 
+            UpdateMQTTState(MQTT_STATE_IDLE)
+
+
 if __name__ == '__main__':
     global mycounter, headless
     global brightness_autofocus, brightness_detect, brightness_measure, flashtime
@@ -281,9 +296,16 @@ if __name__ == '__main__':
     if 'src_runtime' not in cwd:
         os.chdir('src_runtime')
 
+    if os.path.exists("../Debug/counter.txt"):
+        with open("../Debug/counter.txt", "r") as f:
+            counter = int(f.read())
+    else:
+        counter = 0
+
     myconfig = CConfig()
     mycounter = myconfig.GetMyCounter()
     headless = myconfig.GetHeadlessMode()
+    print(f'headless = {headless}')
 
     mqtt_settings = myconfig.GetMQTT()
     mqtt_broker = mqtt_settings['broker']
@@ -294,14 +316,14 @@ if __name__ == '__main__':
     brightness_autofocus = illum['brightness_autofocus']
     brightness_detect = illum['brightness_detect']
     brightness_measure = illum['brightness_measure']
-    flashtime = illm['flashtime']
+    flashtime = illum['flashtime']
 
     servo_settings = myconfig.GetServo()
     servo_iopin = servo_settings['iopin']
     servo_min_duty = servo_settings['min_duty']
     servo_max_duty = servo_settings['max_duty']
 
-    detection = config.GetDetection()
+    detection = myconfig.GetDetection()
     min_mean_difference = detection['min_mean_difference']
 
     cam = init_camera()

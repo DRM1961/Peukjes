@@ -105,7 +105,7 @@ class CMqttClient:
 
 
 if __name__ == "__main__":
-    mqtt = CMqttClient(userdata="dm", user="rpi6", pw="client", broker_IP)
+    mqtt = CMqttClient(userdata="dm", user="rpi6", pw="client", broker=broker_IP)
     mycounter = 1
     count = mqtt.increment_counter(mycounter)
     count = 5
