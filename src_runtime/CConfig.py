@@ -31,7 +31,13 @@ class CConfig:
                     'flashtime': 1.0,
                 },
                 'detection': {
-                    'min_mean_difference = 10'
+                    'method': 'profiles',
+                    'min_mean_difference': 10,
+                    'min_area_difference': 50,
+                    'crop_x': 80,
+                    'crop_y': 0,
+                    'crop_w': 480,
+                    'crop_h': 480,
                 }
             }
             with open(CONFIG_FILE, "w") as file:
@@ -47,11 +53,18 @@ class CConfig:
         return(self.config['servo'])
     def GetIllum(self):
         return(self.config['illum'])
-    def GetDetection(self):
-        return(self.config['detection'])
-
-
-
+    def GetDetectionMethod(self):
+        return(self.config['detection']['method'])
+    def GetDetectionThreshold(self):
+        return({'profile_difference': self.config['detection']['min_mean_difference'],
+                'area_difference': self.config['detection']['min_area_difference']
+                })
+    def GetDetectionCroppingArea(self):
+        return({'crop_x': self.config['detection']['crop_x'],
+                'crop_y': self.config['detection']['crop_y'],
+                'crop_w': self.config['detection']['crop_w'],
+                'crop_h': self.config['detection']['crop_h']
+                })
 
 if __name__ == "__main__":
     myconfig = CConfig()
@@ -66,5 +79,11 @@ if __name__ == "__main__":
     illum = myconfig.GetIllum()
     print(illum)
     brightness_autofocus = illum['brightness_autofocus']
-    detection = myconfig.GetDetection()
-    print(detection)
+    detection_method = myconfig.GetDetectionMethod()
+    print(detection_method)
+    detection_th = myconfig.GetDetectionThreshold()
+    print(detection_th)
+    print(detection_th['area_difference'])
+    cropping = myconfig.GetDetectionCroppingArea()
+    print(cropping)
+    print(cropping['crop_x'])

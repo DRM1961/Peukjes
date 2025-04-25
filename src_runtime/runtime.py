@@ -7,7 +7,10 @@ Created on Tue Mar 25 09:05:59 2025
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
+import logging
 import torch
+
+from common import SetupLogger
 from common import FeatureExtractor18, FeatureExtractor34, FeatureExtractor50,MLPClassifier, transform
 from common_vision import ProfileDirection, ProfileFeature
 from common_vision import InitCamera, ReadInputImage, MakeHorizontalProfile, MakeVerticalProfile
@@ -184,19 +187,57 @@ def get_image_profile_features(frame, saveframe=False):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     #crop image to ROI
+    CROP_X = 0
+    CROP_Y = 1
+    CROP_W = 2
+    CROP_H = 3
+
     h,w = frame.shape
-    y_start = 0
-    y_end = h-1
-    x_start = y_start
-    x_end = y_end
+    #should add checks on cropping area vs actual h/w
+    x_start = cropping_area['crop_x']
+    y_start = cropping_area['crop_y']
+    x_end = cropping_area['crop_w']
+    y_end = cropping_area['crop_h']
  
-    cropped = frame[y_start:y_end, x_start:x_end]
+    cropped = frame[y_start:y_end, x_start:x_end].copy()
  
     if saveframe:
         cv2.imwrite('../Images/empty_orig.png', frame)
         cv2.imwrite('../Images/empty_cropped.png', cropped)
     ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(cropped, direction=0x03, show=False)
-    return(np.mean(ravg), np.mean(cavg))
+    return(np.mean(ravg), np.mean(cavg), cropped)
+
+
+def IsFrameDifferent(imgV, refV):
+    #imgV = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #refV = cv2.cvtColor(imgprev, cv2.COLOR_BGR2GRAY)
+
+    imgV = imgV.astype(np.int16)
+    refV = refV.astype(np.int16)
+    diffV = np.abs(cv2.add(imgV, -refV))
+    diffV = diffV.astype(np.uint8)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    diffV = cv2.erode(diffV, kernel, iterations = 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    diffV = cv2.dilate(diffV, kernel, iterations = 1)
+    th, img_blobs = cv2.threshold(diffV, 20, 255, cv2.THRESH_BINARY)
+    Contours, Hierarchy = cv2.findContours(img_blobs, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    print(f'contour count = {len(Contours)}')
+
+    reject_count = 0
+    reject_area = 0
+    result = img.copy()
+    for c in Contours:
+        print(cv2.boundingRect(c))
+        x,y,w,h = cv2.boundingRect(c)
+        if x>0 and y>0 and w>0 and h>0:
+            cv2.rectangle(result, (x, y), (x+w, y+h), (0, 0, 255), 1)
+            cv2.line(result, (0,0), (int(x+w/2), int(y+h/2)), (0, 0, 255), 1)
+            reject_count+=1
+            reject_area = max(reject_area, w*h)
+
+    return(reject_count, reject_area, result)
 
 def app(cam, servo, mqtt, feature_extactor, scaler, model):
     global mycounter, headless
@@ -217,7 +258,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
         cv2.imshow('img', frame)
 
     #init empty image for detection of object present or not
-    mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame, saveframe=True)
+    mean_ref_ravg, mean_ref_cavg, ref_img = get_image_profile_features(frame, saveframe=True)
     prev_np_mean_diff = 0
 
     if not headless:
@@ -233,13 +274,25 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 break
 		
         #get features from image to see if something is present
-        mean_ravg, mean_cavg = get_image_profile_features(frame)
-        np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
-        if abs(prev_np_mean_diff - np_mean_diff) > 2:
-            print(f'diff of mean = {int(np_mean_diff)}')
-            prev_np_mean_diff = np_mean_diff
+        mean_ravg, mean_cavg, run_img = get_image_profile_features(frame)
+        if detection_method == 'profiles':
+            np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
+            if abs(prev_np_mean_diff - np_mean_diff) > 2:
+                print(f'diff of mean = {int(np_mean_diff)}')
+                prev_np_mean_diff = np_mean_diff
 
-        if abs(np_mean_diff) > min_mean_difference:
+            if abs(np_mean_diff) > detection_threshold['profile_difference']:
+                do_analysis = True
+            else:
+                do_analysis = False
+        else:
+            reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img):
+            if reject_count > 0 && reject_area > detection_threshold['area_difference']
+                do_analysis = True
+            else:
+                do_analysis = False
+
+        if do_analysis:
             UpdateMQTTState(MQTT_STATE_ANALYZE)
             set_illum_white(brightness_measure)
             for i in range(10):  #read buffered frames debounce
@@ -281,15 +334,16 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                     cv2.imshow('img', frame)
 
             #update reference features
-            mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
+            mean_ref_ravg, mean_ref_cavg, ref_img = get_image_profile_features(frame)
 
             UpdateMQTTState(MQTT_STATE_IDLE)
 
 
 if __name__ == '__main__':
-    global mycounter, headless, counter
+    global mylogger, mycounter, headless, counter
     global brightness_autofocus, brightness_detect, brightness_measure, flashtime
-    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference
+    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference, 
+    global cropping_area, detection_method
 
     cwd = os.getcwd()
     print(cwd)
@@ -301,6 +355,8 @@ if __name__ == '__main__':
             counter = int(f.read())
     else:
         counter = 0
+
+    mylogger = SetupLogger("../Debug/mylogger.txt")
 
     myconfig = CConfig()
     mycounter = myconfig.GetMyCounter()
@@ -323,8 +379,9 @@ if __name__ == '__main__':
     servo_min_duty = servo_settings['min_duty']
     servo_max_duty = servo_settings['max_duty']
 
-    detection = myconfig.GetDetection()
-    min_mean_difference = detection['min_mean_difference']
+    detection_method = myconfig.GetDetectionMethod()
+    detection_threshold = myconfig.GetDetectionThreshold()
+    cropping_area = myconfig.GetDetectionCroppingArea()
 
     cam = init_camera()
 
@@ -356,4 +413,10 @@ if __name__ == '__main__':
 	
     SwitchAngle(servo, servo_iopin)
     sleep(2)
+
+
+
+
+
+
 
