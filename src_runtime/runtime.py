@@ -287,9 +287,8 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 do_analysis = False
         else:
             reject_count, reject_area, detection_image = IsFrameDifferent(run_img, ref_img)
-            if reject_count > 0:
-                mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
             if reject_count > 0 and reject_area > detection_threshold['area_difference']:
+                mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
                 do_analysis = True
             else:
                 do_analysis = False
