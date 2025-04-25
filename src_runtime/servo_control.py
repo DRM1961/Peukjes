@@ -1,5 +1,5 @@
 #Set up libraries and overall settings
-import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library 
+#import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library 
 # RPI 5 doesn't have GPIO library
 # pip uninstall RPi.GPIO 
 # and install lgpio instead
@@ -12,7 +12,7 @@ import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library
 from gpiozero import Servo, AngularServo
 from time import sleep   # Imports sleep (aka wait or pause) into the program
 
-extern mylogger
+from common import mylogger
 
 pin = 5
 last_angle = 0

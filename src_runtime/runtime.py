@@ -11,6 +11,7 @@ import logging
 import torch
 
 from common import SetupLogger
+from common import mylogger
 from common import FeatureExtractor18, FeatureExtractor34, FeatureExtractor50,MLPClassifier, transform
 from common_vision import ProfileDirection, ProfileFeature
 from common_vision import InitCamera, ReadInputImage, MakeHorizontalProfile, MakeVerticalProfile
@@ -286,9 +287,9 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
             else:
                 do_analysis = False
         else:
-            reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img):
+            reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img)
             mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
-            if reject_count > 0 && reject_area > detection_threshold['area_difference']
+            if reject_count > 0 and reject_area > detection_threshold['area_difference']:
                 do_analysis = True
             else:
                 do_analysis = False
@@ -341,9 +342,9 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
 
 
 if __name__ == '__main__':
-    global mylogger, mycounter, headless, counter
+    global mycounter, headless, counter
     global brightness_autofocus, brightness_detect, brightness_measure, flashtime
-    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference, 
+    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference
     global cropping_area, detection_method
 
     cwd = os.getcwd()

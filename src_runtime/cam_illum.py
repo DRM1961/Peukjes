@@ -4,8 +4,7 @@ from adafruit_raspberry_pi5_neopixel_write import neopixel_write
 from picamera2 import Picamera2
 from libcamera import controls
 import cv2
-
-extern mylogger
+from common import mylogger
 
 # Configuration
 NEOPIXEL_PIN = board.D13  # GPIO pin connected to NeoPixels

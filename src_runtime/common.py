@@ -11,6 +11,8 @@ import torchvision.models as models
 from PIL import Image
 import logging
 
+mylogger = None
+
 def SetupLogger(fn, outtoconsole=False):
     Logger = logging.getLogger("mylogger")
     Logger.handlers.clear()

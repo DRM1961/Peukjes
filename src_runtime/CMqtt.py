@@ -10,7 +10,7 @@ import time
 import cv2
 import os
 
-extern mylogger
+from common import mylogger
 
 broker_IP="172.21.235.33" 
 #broker_IP="192.168.129.82"
