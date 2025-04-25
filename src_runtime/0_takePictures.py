@@ -7,6 +7,7 @@ from datetime import datetime
 from servo_control import InitServo, SwitchAngle
 from cam_illum import set_illum_white
 
+from common import SetupLogger
 
 servo_iopin = 5
 servo_min_duty = 2.5
@@ -69,6 +70,8 @@ if __name__ == "__main__":
     print(cwd)
     if 'src_runtime' not in cwd:
         os.chdir('src_runtime')
+
+    mylogger = SetupLogger("../Debug/mylogger.txt", outtoconsole=True)
 
     parser = argparse.ArgumentParser(description="Capture high-quality PNG images from Raspberry Pi Camera")
     parser.add_argument("-d", "--directory", default="../Images/Originals/Peukjes", help="Output directory (default Peukjes)")

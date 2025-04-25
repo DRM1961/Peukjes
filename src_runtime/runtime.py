@@ -7,7 +7,10 @@ Created on Tue Mar 25 09:05:59 2025
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
+import logging
 import torch
+
+from common import SetupLogger
 from common import FeatureExtractor18, FeatureExtractor34, FeatureExtractor50,MLPClassifier, transform
 from common_vision import ProfileDirection, ProfileFeature
 from common_vision import InitCamera, ReadInputImage, MakeHorizontalProfile, MakeVerticalProfile
@@ -25,11 +28,15 @@ import numpy as np
 from datetime import datetime
 from time import sleep
 
-USED_RESNET = 34
-#feature_extractor = None
-#fnscaler = ''
-#fnmodel = ''
+from CConfig import CConfig
 
+USED_RESNET = 34
+MQTT_STATE_IDLE = 0
+MQTT_STATE_ANALYZE = 1
+MQTT_STATE_POSITIVE = 2
+MQTT_STATE_NEGATIVE = 3
+
+'''
 mycounter = 1 # or 2
 counter = 0
 
@@ -38,24 +45,37 @@ headless = False
 brightness_autofocus = 0.1
 brightness_detect = 0.1
 brightness_measure = 0.1
+flashtime = 1.0
 
 servo_iopin = 5
 servo_min_duty = 2.2
 servo_max_duty = 9.5
 
 min_mean_difference = 10
+'''
 
-def UpdateMQTT(is_good, frame):
+def UpdateMQTTCounter(is_good, frame):
     global counter
     if is_good:
-        counter = mqtt.increment_counter(mycounter)
-    if mqtt.connected:
-        mqtt.publish(f"counter/{mycounter}", str(counter))
+        counter = mqttclient.increment_counter(mycounter)
+        with open("../Debug/counter.txt", "w") as f:
+            f.write(str(counter))
+
+    if mqttclient.connected:
+        mqttclient.publish(f"counter/{mycounter}", str(counter))
         #mqtt.publish(f"image/{mycounter}", frame, isImage=True)
-        print(f"publishing counter {mycounter}: counter {counter}")
+        mylogger.info(f"publishing counter {mycounter}: counter {counter}")
     else:
-        print(f"NOT publishing counter {mycounter}: counter {counter}")
-        mqtt.publish_via_cmd(f"counter/{mycounter}", str(counter))
+        mylogger.info(f"NOT publishing counter {mycounter}: counter {counter}")
+        mqttclient.publish_via_cmd(f"counter/{mycounter}", str(counter))
+
+def UpdateMQTTState(state):
+    if mqttclient.connected:
+        mqttclient.publish(f"state/{mycounter}", str(state))
+        mylogger.info(f"publishing state {mycounter}: state {state}")
+    else:
+        mylogger.info(f"NOT publishing state {mycounter}: state {state}")
+        mqttclient.publish_via_cmd(f"state/{mycounter}", str(state))
 
 def get_image_profiles(img, direction=3, show=False):
     hbase, wbase = img.shape[:2]
@@ -107,7 +127,7 @@ def get_image_profiles(img, direction=3, show=False):
 
 def init_NNmodel():
     #init nnmodel
-    print(f'load model resnet{USED_RESNET}')
+    mylogger.info(f'load model resnet{USED_RESNET}')
     if USED_RESNET == 50:
         feature_extractor = FeatureExtractor50()
         input_dim = 2048  # Adjust based on ResNet feature size: 34 = 512, 50 = 2048
@@ -124,14 +144,14 @@ def init_NNmodel():
         fnscaler = '../Data/scaler_18.pkl'
         fnmodel = '../Data/mlp_model_18.pth'
     else:
-        print(f"error: Resnet{USED_RESNET} not defined")
+        mylogger.info(f"error: Resnet{USED_RESNET} not defined")
         exit
 
     scaler = joblib.load(fnscaler)
     model = MLPClassifier(input_dim)
     model.load_state_dict(torch.load(fnmodel))  # Load saved weights
     model.eval()
-    print("Model loaded successfully and ready for inference!")
+    mylogger.info("Model loaded successfully and ready for inference!")
 
     return(feature_extractor, scaler, model)
 
@@ -162,172 +182,218 @@ def process_image(frame, feature_extractor, scaler, model):
 
     return(obj_is_good, good_score, bad_score)
 
-def get_image_profile_features(frame):
-    if len(frame.shape) == 3:  # if not gray already
+def get_image_profile_features(frame, saveframe=False):
+    if len(frame.shape) > 1:  # if not gray already
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    #cv2.imwrite('../Images/empty.png', frame)
-    #frame,_,_,_,_ = ReadInputImage('../Images/empty.png')
+    #crop image to ROI
+    CROP_X = 0
+    CROP_Y = 1
+    CROP_W = 2
+    CROP_H = 3
 
-    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(frame, direction=0x03, show=False)
-    return(np.mean(ravg), np.mean(cavg))
+    h,w = frame.shape
+    #should add checks on cropping area vs actual h/w
+    x_start = cropping_area['crop_x']
+    y_start = cropping_area['crop_y']
+    x_end = cropping_area['crop_w']
+    y_end = cropping_area['crop_h']
+ 
+    cropped = frame[y_start:y_end, x_start:x_end].copy()
+ 
+    if saveframe:
+        cv2.imwrite('../Images/empty_orig.png', frame)
+        cv2.imwrite('../Images/empty_cropped.png', cropped)
+    ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(cropped, direction=0x03, show=False)
+    return(np.mean(ravg), np.mean(cavg), cropped)
 
-def app(cam, cameratype, pwm, mqtt, feature_extactor, scaler, model):
-    global brightness_autofocus, brightness_detect, brightness_measure
-    print('check position of cup below the camera; press ESC to exit and start processing real images')
+
+def IsFrameDifferent(imgV, refV):
+    #imgV = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #refV = cv2.cvtColor(imgprev, cv2.COLOR_BGR2GRAY)
+
+    imgV = imgV.astype(np.int16)
+    refV = refV.astype(np.int16)
+    diffV = np.abs(cv2.add(imgV, -refV))
+    diffV = diffV.astype(np.uint8)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    diffV = cv2.erode(diffV, kernel, iterations = 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    diffV = cv2.dilate(diffV, kernel, iterations = 1)
+    th, img_blobs = cv2.threshold(diffV, 20, 255, cv2.THRESH_BINARY)
+    Contours, Hierarchy = cv2.findContours(img_blobs, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    mylogger.info(f'contour count = {len(Contours)}')
+
+    reject_count = 0
+    reject_area = 0
+    result = img.copy()
+    for c in Contours:
+        mylogger.info(f'found contour {cv2.boundingRect(c)}')
+        x,y,w,h = cv2.boundingRect(c)
+        if x>0 and y>0 and w>0 and h>0:
+            cv2.rectangle(result, (x, y), (x+w, y+h), (0, 0, 255), 1)
+            cv2.line(result, (0,0), (int(x+w/2), int(y+h/2)), (0, 0, 255), 1)
+            reject_count+=1
+            reject_area = max(reject_area, w*h)
+
+    return(reject_count, reject_area, result)
+
+def app(cam, servo, mqtt, feature_extactor, scaler, model):
+    global mycounter, headless
+    global brightness_autofocus, brightness_detect, brightness_measure, flashtime
+    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference
 
     set_illum_white(brightness_autofocus)
-    focussed = False
-    while True:
-        if cameratype != 'picamera2':
-            ret, frame = cam.read()
-            if not ret:
-                break
-        else:
-            if not focussed:
-                try:
-                    cam.autofocus_cycle()
-                    print("Autofocus finished")
-                except:
-                    print("Autofocus not available - using fixed focus")
-                focussed = True
-            frame = cam.capture_array()
-            #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        
-        if not headless:
-            cv2.imshow('img', frame)
-            # Press ESC to exit the loop
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
+    try:
+        cam.autofocus_cycle()
+        mylogger.info("Autofocus finished")
+    except:
+        mylogger.info("Autofocus not available - using fixed focus")
+    focussed = True
+    frame = cam.capture_array()
+    mylogger.info(f'frame shape = {frame.shape}')
 
-            if cv2.getWindowProperty('img', 1) < 0:
-                break
+    if not headless:
+        cv2.imshow('img', frame)
 
     #init empty image for detection of object present or not
-    mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
-    print('starting the main loop: press ESC to exit')
+    mean_ref_ravg, mean_ref_cavg, ref_img = get_image_profile_features(frame, saveframe=True)
     prev_np_mean_diff = 0
 
-    while True:
-        if cameratype != 'picamera2':
-            ret, frame = cam.read()
-            if not ret:
-                break
-        else:
-            frame = cam.capture_array()
-            #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    if not headless:
+        mylogger.info('starting the main loop: press ESC to exit')
 
+    UpdateMQTTState(MQTT_STATE_IDLE)
+
+    while True:
+        frame = cam.capture_array()
         if not headless:
             cv2.imshow('img', frame)
-
-	    # Press ESC to exit the loop
-        if cv2.waitKey(1) & 0xFF == 27:
-	        break
+            if cv2.waitKey(1) & 0xFF == 27:
+                break
 		
         #get features from image to see if something is present
-        mean_ravg, mean_cavg = get_image_profile_features(frame)
-        np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
-        if abs(prev_np_mean_diff - np_mean_diff) > 2:
-            print(f'diff of mean = {int(np_mean_diff)}')
-            prev_np_mean_diff = np_mean_diff
+        mean_ravg, mean_cavg, run_img = get_image_profile_features(frame)
+        if detection_method == 'profiles':
+            np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
+            if abs(prev_np_mean_diff - np_mean_diff) > 2:
+                mylogger.info(f'diff of mean = {int(np_mean_diff)}')
+                prev_np_mean_diff = np_mean_diff
 
-        if abs(np_mean_diff) > min_mean_difference:
+            if abs(np_mean_diff) > detection_threshold['profile_difference']:
+                do_analysis = True
+            else:
+                do_analysis = False
+        else:
+            reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img):
+            mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
+            if reject_count > 0 && reject_area > detection_threshold['area_difference']
+                do_analysis = True
+            else:
+                do_analysis = False
+
+        if do_analysis:
+            UpdateMQTTState(MQTT_STATE_ANALYZE)
             set_illum_white(brightness_measure)
             for i in range(10):  #read buffered frames debounce
-                if cameratype != 'picamera2':
-                    _, frame = cam.read()
-                else:
-                    frame = cam.capture_array()
-                    #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                frame = cam.capture_array()
+                if not headless:
+                    cv2.imshow('img', frame)
 
-            if not headless:
-                cv2.imshow('img', frame)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
             is_good, val_good, val_bad = process_image(frame, feature_extractor, scaler, model)
 
-            print(f'is good: {is_good}, scores ({val_good}, {val_bad}')
+            mylogger.info(f'is good: {is_good}, scores ({val_good}, {val_bad}')
             fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}.png'
             fn = fn.replace(":", "-")
             cv2.imwrite(fn, frame)
             
             if is_good:
-                flash_illum('green', 2)
+                flash_illum('green', flashtime)
+                UpdateMQTTState(MQTT_STATE_POSITIVE)
             else:
-                flash_illum('red', 2)
+                flash_illum('red', flashtime)
+                UpdateMQTTState(MQTT_STATE_NEGATIVE)
 
-            UpdateMQTT(is_good, frame)
+            UpdateMQTTCounter(is_good, frame)
 
-            if pwm:
-                SwitchAngle(pwm, servo_iopin)
+            if servo:
+                SwitchAngle(servo, servo_iopin)
                 sleep(1)
-
-            if not pwm:
-                print("press 'c' to continue")
-                if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
-                    continue
+            else:
+                if not headless:
+                    print("press 'c' to continue")
+                    if cv2.waitKey(0) & 0xFF == 'c': #flush buffered image
+                        continue
 
             set_illum_white(brightness_detect)
             for i in range(30):  #read buffered frames
-                if cameratype != 'picamera2':
-                    _, frame = cam.read()
-                else:
-                    frame = cam.capture_array()
-                    #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                frame = cam.capture_array()
                 if not headless:
                     cv2.imshow('img', frame)
 
             #update reference features
-            mean_ref_ravg, mean_ref_cavg = get_image_profile_features(frame)
+            mean_ref_ravg, mean_ref_cavg, ref_img = get_image_profile_features(frame)
+
+            UpdateMQTTState(MQTT_STATE_IDLE)
+
 
 if __name__ == '__main__':
+    global mylogger, mycounter, headless, counter
+    global brightness_autofocus, brightness_detect, brightness_measure, flashtime
+    global servo_iopin, servo_min_duty, servo_max_duty, min_mean_difference, 
+    global cropping_area, detection_method
+
     cwd = os.getcwd()
     print(cwd)
     if 'src_runtime' not in cwd:
         os.chdir('src_runtime')
 
-    cameratype = 'picamera2'
-
-    if cameratype != 'picamera2':
-        # use opencv camera
-        # check if camera is available
-        # CAMID = 0 #0 = internal cam, 1..n = external
-        CAMID = 1 #0 = internal cam, 1..n = external
-                # for external cameras, camid nr doesn't work on ubuntu on rpi, must use /dev/video
-                # use: 'lsusb' to check if camera is listed
-                # use: 'v4l2-ctl' to get camera connection overview
-                # sudo apt-get install v4l-utils
-                # v4l2-ctl --list-devices
-
-        print('init camera, this takes a while')
-        if os.name=='nt':
-            cam = cv2.VideoCapture(CAMID)
-        else:
-            cam = cv2.VideoCapture('/dev/video0')
-            
-        if cam.isOpened():
-            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
-            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
-
-            cam.set(cv2.CAP_PROP_BRIGHTNESS, 0)
-        else:
-            print(f'cannot open camera {CAMID}')
-            pass
-            
-        cam_w = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        cam_h = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(cam_w, cam_h)
+    if os.path.exists("../Debug/counter.txt"):
+        with open("../Debug/counter.txt", "r") as f:
+            counter = int(f.read())
     else:
-        cam = init_camera()
+        counter = 0
+
+    mylogger = SetupLogger("../Debug/mylogger.txt", outtoconsole=True)
+
+    myconfig = CConfig()
+    mycounter = myconfig.GetMyCounter()
+    headless = myconfig.GetHeadlessMode()
+
+    mqtt_settings = myconfig.GetMQTT()
+    mqtt_broker = mqtt_settings['broker']
+    mqtt_user = mqtt_settings['user']
+    mqtt_pw = mqtt_settings['pw']
+
+    illum = myconfig.GetIllum()
+    brightness_autofocus = illum['brightness_autofocus']
+    brightness_detect = illum['brightness_detect']
+    brightness_measure = illum['brightness_measure']
+    flashtime = illum['flashtime']
+
+    servo_settings = myconfig.GetServo()
+    servo_iopin = servo_settings['iopin']
+    servo_min_duty = servo_settings['min_duty']
+    servo_max_duty = servo_settings['max_duty']
+
+    detection_method = myconfig.GetDetectionMethod()
+    detection_threshold = myconfig.GetDetectionThreshold()
+    cropping_area = myconfig.GetDetectionCroppingArea()
+
+    cam = init_camera()
 
     #init servo
-    pwm = InitServo(servo_iopin, servo_min_duty, servo_max_duty)
-    SwitchAngle(pwm, servo_iopin)
+    servo = InitServo(servo_iopin, servo_min_duty, servo_max_duty)
+    SwitchAngle(servo, servo_iopin)
     sleep(2)
-    SwitchAngle(pwm, servo_iopin)
+    SwitchAngle(servo, servo_iopin)
 
     #init mqtt
-    mqtt = CMqttClient(userdata="rpi6", user="rpi6", pw="client")
-    mqtt.subscribe(f"set_counter/{mycounter}")
+    mqttclient = CMqttClient(userdata="rpi", user=mqtt_user, pw=mqtt_pw, broker=mqtt_broker)
+    mqttclient.subscribe(f"set_counter/{mycounter}")
 
     #init nnmodel
     feature_extractor, scaler, model = init_NNmodel()
@@ -336,8 +402,7 @@ if __name__ == '__main__':
     if not headless:	
         cv2.namedWindow('img', cv2.WINDOW_NORMAL)
 
-
-    app(cam, cameratype, pwm, mqtt, feature_extractor, scaler, model)
+    app(cam, servo, mqttclient, feature_extractor, scaler, model)
 
     # Release the capture and writer objects
     if not headless:
@@ -346,7 +411,12 @@ if __name__ == '__main__':
     set_illum_white(0.0)
     #cam.release()
 	
-    SwitchAngle(pwm, servo_iopin)
+    SwitchAngle(servo, servo_iopin)
     sleep(2)
-    #pwm.stop() 
+
+
+
+
+
+
 
