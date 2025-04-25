@@ -29,6 +29,7 @@ class CMqttClient:
         self.filename = ""
         self.connected = False
         self.subscribed = False
+        self.broker = broker
         #TODO: set an LED to indicate connection status
         try:
             #self.client = mqtt.Client(userdata=userdata)  
@@ -44,7 +45,7 @@ class CMqttClient:
     def on_connect(self, client, userdata, flags, rc):
         mylogger.info(f'Connected with result code {str(rc)}')
         mylogger.info(f'Connected client {client} userdata {userdata} flags {flags} return code {rc}')
-        if rc == 0:
+        if rc == 0:broker
             self.connected = True
 
     def on_subscribe(self, client, userdata, mid, granted_qos):
@@ -94,10 +95,10 @@ class CMqttClient:
             file = open(datastring, "rb")
             filestring = file.read()
             byteArray = bytes(filestring)
-            oscmd = f'mosquitto_pub -d -h {broker_IP} -t "{topic}" -f "{datastring}" -u {self.user} -P {self.pw}'
+            oscmd = f'mosquitto_pub -d -h {self.broker} -t "{topic}" -f "{datastring}" -u {self.user} -P {self.pw}'
             #os.system(oscmd)
         else:
-            oscmd = f'mosquitto_pub -d -h {broker_IP} -t "{topic}" -m "{datastring}" -u {self.user} -P {self.pw}'
+            oscmd = f'mosquitto_pub -d -h {self.broker} -t "{topic}" -m "{datastring}" -u {self.user} -P {self.pw}'
             mylogger.info(f'sending >{oscmd}<')
             os.system(oscmd)
 
