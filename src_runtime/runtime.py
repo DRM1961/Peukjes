@@ -67,7 +67,7 @@ def UpdateMQTTCounter(is_good, frame):
         mylogger.info(f"publishing counter {mycounter}: counter {counter}")
     else:
         mylogger.info(f"NOT publishing counter {mycounter}: counter {counter}")
-        mqttclient.publish_via_cmd(f"counter/{mycounter}", str(counter))
+        #mqttclient.publish_via_cmd(f"counter/{mycounter}", str(counter))
 
 def UpdateMQTTState(state):
     if mqttclient.connected:
@@ -75,7 +75,7 @@ def UpdateMQTTState(state):
         mylogger.info(f"publishing state {mycounter}: state {state}")
     else:
         mylogger.info(f"NOT publishing state {mycounter}: state {state}")
-        mqttclient.publish_via_cmd(f"state/{mycounter}", str(state))
+        #mqttclient.publish_via_cmd(f"state/{mycounter}", str(state))
 
 def get_image_profiles(img, direction=3, show=False):
     hbase, wbase = img.shape[:2]
