@@ -34,6 +34,12 @@ def align_images_method_ECC(reference, image):
     gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+    _, _, red_ref = cv2.split(reference)
+    _, _, red_img = cv2.split(image)
+
+    gray_ref = red_ref.copy()
+    gray_img = red_img.copy()
+
     # ECC alignment
     warp_mode = cv2.MOTION_EUCLIDEAN
     warp_matrix = np.eye(2, 3, dtype=np.float32)
@@ -48,7 +54,7 @@ def align_images_method_ECC(reference, image):
 
     return cc, aligned_image
 
-def extract_object(reference, image, fileindex):
+def extract_object(reference, image, mask, fileindex):
     # Convert images to grayscale
     gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -58,10 +64,13 @@ def extract_object(reference, image, fileindex):
     gray_ref = red_ref.copy()
     gray_img = red_img.copy()
 
+    gray_ref = cv2.bitwise_and(gray_ref, gray_ref, mask=mask)
+    gray_img = cv2.bitwise_and(gray_img, gray_img, mask=mask)
+
     # Compute absolute difference
     diff = cv2.absdiff(gray_img, gray_ref)
     cv2.imwrite(f'../Images/Diff/diff_{fileindex:03d}.png', diff)
-    _, thresh = cv2.threshold(diff, 20, 128, cv2.THRESH_BINARY)
+    _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
 
     # Find contours
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -135,6 +144,17 @@ def rotate_and_merge(reference, object_rgba, bbox, angles=[0, 90, 180, 270]):
 
     return results
 
+def make_fg_mask(reference):
+    gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
+    mask = np.zeros(gray_ref.shape[:2], dtype="uint8")
+    ret, img_th = cv2.threshold(gray_ref, 70, 255, cv2.THRESH_BINARY)
+    kernel = np.ones((5,5), np.uint8)
+    mask = cv2.erode(img_th, kernel, iterations=2)
+    mask = cv2.erode(mask, kernel, iterations=2)
+    mask = cv2.bitwise_not(mask)
+
+    return mask
+
 
 PATH_REFERENCE_IMAGE = '../Images/empty.png'
 PATH_GOOD_INPUT_IMAGES = '../Images/Originals/Peukjes'
@@ -152,6 +172,7 @@ def main():
 
     reference_img = cv2.imread(PATH_REFERENCE_IMAGE)
     href, wref = reference_img.shape[:2]
+    empty_mask = make_fg_mask(reference_img)
 
     for category in ['Good', 'Bad']:
         if category == 'Good':
@@ -174,11 +195,12 @@ def main():
             print(f"ECC Score for {fileindex+1}:", confidence)
 
             if confidence > 0.1:
-                object_rgba, bbox = extract_object(reference_img, aligned_img, fileindex)
+                object_rgba, bbox = extract_object(reference_img, aligned_img, empty_mask, fileindex)
                 todirfn = os.path.join(PATH_EXTRACT, f'{fromfn}_{fileindex+1:03d}_extract.png')
                 cv2.imwrite(todirfn, object_rgba)
 
                 augmented_images = rotate_and_merge(reference_img, object_rgba, bbox, angles)
+                #augmented_images = []
 
                 for i, img in enumerate(augmented_images):
                     todirfn = os.path.join(todir, f'{category}_{fileindex+1:03d}_Augment_{i+1:02d}.png')
