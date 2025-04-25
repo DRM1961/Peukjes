@@ -57,7 +57,7 @@ min_mean_difference = 10
 def UpdateMQTTCounter(is_good, frame):
     global counter
     if is_good:
-        counter = mqttclient.increment_counter(mycounter)
+        counter = counter+1
         with open("../Debug/counter.txt", "w") as f:
             f.write(str(counter))
 
