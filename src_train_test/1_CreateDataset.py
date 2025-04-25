@@ -55,7 +55,8 @@ def extract_object(reference, image):
 
     # Compute absolute difference
     diff = cv2.absdiff(gray_img, gray_ref)
-    _, thresh = cv2.threshold(diff, 100, 255, cv2.THRESH_BINARY)
+    cv2.imwrite('../Images/diff.png', diff)
+    _, thresh = cv2.threshold(diff, 20, 128, cv2.THRESH_BINARY)
 
     # Find contours
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -94,47 +95,48 @@ def rotate_and_merge(reference, object_rgba, bbox, angles=[0, 90, 180, 270]):
         M[0, 2] += (new_w - w) / 2
         M[1, 2] += (new_h - h) / 2
 
-        # Rotate with correct bounding box
-        rotated = cv2.warpAffine(obj, M, (new_w, new_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+        if new_w > 0 and new_h > 0:
+            # Rotate with correct bounding box
+            rotated = cv2.warpAffine(obj, M, (new_w, new_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
 
-        # Ensure roi has the same shape as rotated
-        overlay = reference.copy()
-        img_h, img_w = overlay.shape[:2]
-        roi_x, roi_y = max(0, x - (new_w - w) // 2), max(0, y - (new_h - h) // 2)
-        roi_h, roi_w = rotated.shape[:2]
+            # Ensure roi has the same shape as rotated
+            overlay = reference.copy()
+            img_h, img_w = overlay.shape[:2]
+            roi_x, roi_y = max(0, x - (new_w - w) // 2), max(0, y - (new_h - h) // 2)
+            roi_h, roi_w = rotated.shape[:2]
 
-        if roi_y + roi_h >= img_h:
-            roi_y = max(0, img_h - roi_h - 1)
-            if roi_y==0 and roi_h >= img_h:
-                roi_h = img_h
-                rotated = rotated[0:roi_h,:]
-        if roi_x + roi_w >= img_w:
-            roi_x = max(0, img_w - roi_w - 1)
-            if roi_x==0 and roi_w >= img_w:
-                roi_w = img_w
-                rotated = rotated[:,0:roi_w]
+            if roi_y + roi_h >= img_h:
+                roi_y = max(0, img_h - roi_h - 1)
+                if roi_y==0 and roi_h >= img_h:
+                    roi_h = img_h
+                    rotated = rotated[0:roi_h,:]
+            if roi_x + roi_w >= img_w:
+                roi_x = max(0, img_w - roi_w - 1)
+                if roi_x==0 and roi_w >= img_w:
+                    roi_w = img_w
+                    rotated = rotated[:,0:roi_w]
 
-        # Adjust ROI dimensions to avoid mismatch
-        roi = overlay[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w]
-        if roi.shape[:2] != rotated.shape[:2]:
-            continue  # Skip if dimensions do not match
+            # Adjust ROI dimensions to avoid mismatch
+            roi = overlay[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w]
+            if roi.shape[:2] != rotated.shape[:2]:
+                continue  # Skip if dimensions do not match
 
-        # Blend transparent image
-        alpha = rotated[:, :, 3] / 255.0
-        for c in range(3):
-            roi[:, :, c] = roi[:, :, c] * (1 - alpha) + rotated[:, :, c] * alpha
-        overlay[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w] = roi
-        results.append(overlay)
+            # Blend transparent image
+            alpha = rotated[:, :, 3] / 255.0
+            for c in range(3):
+                roi[:, :, c] = roi[:, :, c] * (1 - alpha) + rotated[:, :, c] * alpha
+            overlay[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w] = roi
+            results.append(overlay)
 
     return results
 
 
 PATH_REFERENCE_IMAGE = '../Images/empty.png'
 PATH_GOOD_INPUT_IMAGES = '../Images/Originals/Peukjes'
-PATH_ROTATED_GOOD_IMAGES = '../Images/DataSet'
+PATH_ROTATED_GOOD_IMAGES = '../Images/Dataset'
 PATH_EXTRACT = '../Images/Extract'
 PATH_BAD_INPUT_IMAGES = '../Images/Originals/GeenPeukjes'
-PATH_ROTATED_BAD_IMAGES = '../Images/DataSet'
+PATH_ROTATED_BAD_IMAGES = '../Images/Dataset'
 
 def main():
     reference_img = cv2.imread(PATH_REFERENCE_IMAGE)

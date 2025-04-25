@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 
 USE_RESNET = 34
-REFERENCE_IMAGE_FOLDER = "../Images/DataSet"
+REFERENCE_IMAGE_FOLDER = "../Images/Dataset"
 
 feature_extractor = None
 fnscaler = ''

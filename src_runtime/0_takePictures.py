@@ -9,8 +9,8 @@ from cam_illum import set_illum_white
 
 
 servo_iopin = 5
-servo_min_duty = 2.2
-servo_max_duty = 9.5
+servo_min_duty = 2.5
+servo_max_duty = 10.5
 
 def capture_image(output_dir, filename=None, 
                  delay=1, sharpness=2.0, format='png'):
