@@ -17,7 +17,7 @@ illum:
 detection:
   method: images
   min_mean_difference: 5.0
-  min_area_difference: 1200.0
+  min_area_difference: 25000.0
   crop_x: 400
   crop_y: 0
   crop_w: 1600
