@@ -309,9 +309,10 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
             fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}'
             fn = fn.replace(":", "-")
             cv2.imwrite(f'{fn}_processed.png', frame)
-            cv2.imwrite(f'{fn}_detected.png', detection_image)
+            cv2.imwrite(f'{fn}_detected.jpg', detection_image)
             mylogger.info(f'{fn}: is good: {is_good}, scores ({val_good}, {val_bad}')
             
+            is_good = True ## TODO : Fix above and remove override
             if is_good:
                 flash_illum('green', flashtime)
                 UpdateMQTTState(MQTT_STATE_POSITIVE)
