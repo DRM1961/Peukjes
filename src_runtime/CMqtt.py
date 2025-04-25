@@ -45,7 +45,7 @@ class CMqttClient:
     def on_connect(self, client, userdata, flags, rc):
         mylogger.info(f'Connected with result code {str(rc)}')
         mylogger.info(f'Connected client {client} userdata {userdata} flags {flags} return code {rc}')
-        if rc == 0:broker
+        if rc == 0:
             self.connected = True
 
     def on_subscribe(self, client, userdata, mid, granted_qos):
