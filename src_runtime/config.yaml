@@ -7,8 +7,8 @@ mqtt:
   user: gui
 servo:
   iopin: 5
-  min_duty: 2.2
-  max_duty: 9.5
+  min_duty: 2.5
+  max_duty: 10.5
 illum:
   brightness_autofocus: 0.1
   brightness_detect: 0.1
@@ -17,8 +17,8 @@ illum:
 detection:
   method: images
   min_mean_difference: 5.0
-  min_area_difference: 60.0
-  crop_x: 80
+  min_area_difference: 1000.0
+  crop_x: 400
   crop_y: 0
-  crop_w: 480
-  crop_h: 480
+  crop_w: 1600
+  crop_h: 1080

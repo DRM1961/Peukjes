@@ -202,8 +202,8 @@ def get_image_profile_features(frame, saveframe=False):
     cropped = frame[y_start:y_end, x_start:x_end].copy()
  
     if saveframe:
-        cv2.imwrite('../Images/empty_orig.png', frame)
-        cv2.imwrite('../Images/empty_cropped.png', cropped)
+        cv2.imwrite('../Debug/empty_orig.png', frame)
+        cv2.imwrite('../Debug/empty_cropped.png', cropped)
     ravg, rmin, rmax, cavg, cmin, cmax = get_image_profiles(cropped, direction=0x03, show=False)
     return(np.mean(ravg), np.mean(cavg), cropped)
 
@@ -223,13 +223,13 @@ def IsFrameDifferent(imgV, refV):
     diffV = cv2.dilate(diffV, kernel, iterations = 1)
     th, img_blobs = cv2.threshold(diffV, 20, 255, cv2.THRESH_BINARY)
     Contours, Hierarchy = cv2.findContours(img_blobs, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    mylogger.info(f'contour count = {len(Contours)}')
+    #mylogger.info(f'contour count = {len(Contours)}')
 
     reject_count = 0
     reject_area = 0
     result = imgV.copy()
     for c in Contours:
-        mylogger.info(f'found contour {cv2.boundingRect(c)}')
+        #mylogger.info(f'found contour {cv2.boundingRect(c)}')
         x,y,w,h = cv2.boundingRect(c)
         if x>0 and y>0 and w>0 and h>0:
             cv2.rectangle(result, (x, y), (x+w, y+h), (0, 0, 255), 1)
@@ -286,9 +286,9 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
             else:
                 do_analysis = False
         else:
-            reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img)
+            reject_count, reject_area, detection_image = IsFrameDifferent(run_img, ref_img)
             if reject_count > 0:
-            mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
+                mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
             if reject_count > 0 and reject_area > detection_threshold['area_difference']:
                 do_analysis = True
             else:
@@ -306,10 +306,11 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
 
             is_good, val_good, val_bad = process_image(frame, feature_extractor, scaler, model)
 
-            mylogger.info(f'is good: {is_good}, scores ({val_good}, {val_bad}')
-            fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}.png'
+            fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}'
             fn = fn.replace(":", "-")
-            cv2.imwrite(fn, frame)
+            cv2.imwrite(f'{fn}_processed.png', frame)
+            cv2.imwrite(f'{fn}_detected.png', detection_image)
+            mylogger.info(f'{fn}: is good: {is_good}, scores ({val_good}, {val_bad}')
             
             if is_good:
                 flash_illum('green', flashtime)

@@ -85,7 +85,7 @@ def init_camera():
     config = cam.create_still_configuration(
         main={"size": resolution, "format": "RGB888"},
         controls={          
-            "AwbEnable": True,
+            "AwbEnable": False,
             "AeEnable": True,
             "AnalogueGain": 1.0,
             "Sharpness": sharpness,
