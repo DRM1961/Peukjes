@@ -5,6 +5,8 @@ from picamera2 import Picamera2
 from libcamera import controls
 import cv2
 
+extern mylogger
+
 # Configuration
 NEOPIXEL_PIN = board.D13  # GPIO pin connected to NeoPixels
 NUM_PIXELS = 12           # Number of LEDs in your ring
@@ -92,12 +94,12 @@ def init_camera():
         }
     )
     cam.configure(config)
-    print(cam.camera_ctrl_info.keys())
-    print(cam.sensor_modes)
+    mylogger.info(f'cam info keys {cam.camera_ctrl_info.keys()}')
+    mylogger.info(f'cam sensor modes {cam.sensor_modes}')
     #cam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 10.0})
     #cam.set_controls({"ScalerCrop": scaler_crop})
         
-    print("Starting camera...")
+    mylogger.info("Starting camera...")
     cam.start()
 
     return cam

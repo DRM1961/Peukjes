@@ -12,6 +12,8 @@ import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library
 from gpiozero import Servo, AngularServo
 from time import sleep   # Imports sleep (aka wait or pause) into the program
 
+extern mylogger
+
 pin = 5
 last_angle = 0
 freq = 50
@@ -71,7 +73,7 @@ def SwitchAngle(pwm, pin):
     else:
         last_angle = 0
     SetAngle(pwm, pin, last_angle)
-    print(f'new angle = {last_angle}')
+    mylogger.info(f'new angle = {last_angle}')
 
 
 if __name__ == "__main__":

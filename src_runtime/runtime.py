@@ -64,17 +64,17 @@ def UpdateMQTTCounter(is_good, frame):
     if mqttclient.connected:
         mqttclient.publish(f"counter/{mycounter}", str(counter))
         #mqtt.publish(f"image/{mycounter}", frame, isImage=True)
-        print(f"publishing counter {mycounter}: counter {counter}")
+        mylogger.info(f"publishing counter {mycounter}: counter {counter}")
     else:
-        print(f"NOT publishing counter {mycounter}: counter {counter}")
+        mylogger.info(f"NOT publishing counter {mycounter}: counter {counter}")
         mqttclient.publish_via_cmd(f"counter/{mycounter}", str(counter))
 
 def UpdateMQTTState(state):
     if mqttclient.connected:
         mqttclient.publish(f"state/{mycounter}", str(state))
-        print(f"publishing state {mycounter}: state {state}")
+        mylogger.info(f"publishing state {mycounter}: state {state}")
     else:
-        print(f"NOT publishing state {mycounter}: state {state}")
+        mylogger.info(f"NOT publishing state {mycounter}: state {state}")
         mqttclient.publish_via_cmd(f"state/{mycounter}", str(state))
 
 def get_image_profiles(img, direction=3, show=False):
@@ -127,7 +127,7 @@ def get_image_profiles(img, direction=3, show=False):
 
 def init_NNmodel():
     #init nnmodel
-    print(f'load model resnet{USED_RESNET}')
+    mylogger.info(f'load model resnet{USED_RESNET}')
     if USED_RESNET == 50:
         feature_extractor = FeatureExtractor50()
         input_dim = 2048  # Adjust based on ResNet feature size: 34 = 512, 50 = 2048
@@ -144,14 +144,14 @@ def init_NNmodel():
         fnscaler = '../Data/scaler_18.pkl'
         fnmodel = '../Data/mlp_model_18.pth'
     else:
-        print(f"error: Resnet{USED_RESNET} not defined")
+        mylogger.info(f"error: Resnet{USED_RESNET} not defined")
         exit
 
     scaler = joblib.load(fnscaler)
     model = MLPClassifier(input_dim)
     model.load_state_dict(torch.load(fnmodel))  # Load saved weights
     model.eval()
-    print("Model loaded successfully and ready for inference!")
+    mylogger.info("Model loaded successfully and ready for inference!")
 
     return(feature_extractor, scaler, model)
 
@@ -223,13 +223,13 @@ def IsFrameDifferent(imgV, refV):
     diffV = cv2.dilate(diffV, kernel, iterations = 1)
     th, img_blobs = cv2.threshold(diffV, 20, 255, cv2.THRESH_BINARY)
     Contours, Hierarchy = cv2.findContours(img_blobs, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    print(f'contour count = {len(Contours)}')
+    mylogger.info(f'contour count = {len(Contours)}')
 
     reject_count = 0
     reject_area = 0
     result = img.copy()
     for c in Contours:
-        print(cv2.boundingRect(c))
+        mylogger.info(f'found contour {cv2.boundingRect(c)}')
         x,y,w,h = cv2.boundingRect(c)
         if x>0 and y>0 and w>0 and h>0:
             cv2.rectangle(result, (x, y), (x+w, y+h), (0, 0, 255), 1)
@@ -247,12 +247,12 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
     set_illum_white(brightness_autofocus)
     try:
         cam.autofocus_cycle()
-        print("Autofocus finished")
+        mylogger.info("Autofocus finished")
     except:
-        print("Autofocus not available - using fixed focus")
+        mylogger.info("Autofocus not available - using fixed focus")
     focussed = True
     frame = cam.capture_array()
-    print(f'frame shape = {frame.shape}')
+    mylogger.info(f'frame shape = {frame.shape}')
 
     if not headless:
         cv2.imshow('img', frame)
@@ -262,7 +262,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
     prev_np_mean_diff = 0
 
     if not headless:
-        print('starting the main loop: press ESC to exit')
+        mylogger.info('starting the main loop: press ESC to exit')
 
     UpdateMQTTState(MQTT_STATE_IDLE)
 
@@ -278,7 +278,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
         if detection_method == 'profiles':
             np_mean_diff = max(int(abs(mean_ref_cavg - mean_cavg)), int(abs(mean_ref_ravg-mean_ravg)))
             if abs(prev_np_mean_diff - np_mean_diff) > 2:
-                print(f'diff of mean = {int(np_mean_diff)}')
+                mylogger.info(f'diff of mean = {int(np_mean_diff)}')
                 prev_np_mean_diff = np_mean_diff
 
             if abs(np_mean_diff) > detection_threshold['profile_difference']:
@@ -287,6 +287,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 do_analysis = False
         else:
             reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img):
+            mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
             if reject_count > 0 && reject_area > detection_threshold['area_difference']
                 do_analysis = True
             else:
@@ -304,7 +305,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
 
             is_good, val_good, val_bad = process_image(frame, feature_extractor, scaler, model)
 
-            print(f'is good: {is_good}, scores ({val_good}, {val_bad}')
+            mylogger.info(f'is good: {is_good}, scores ({val_good}, {val_bad}')
             fn = f'../Debug/{datetime.now().isoformat(sep=" ", timespec="seconds")}_{is_good}.png'
             fn = fn.replace(":", "-")
             cv2.imwrite(fn, frame)
@@ -356,12 +357,11 @@ if __name__ == '__main__':
     else:
         counter = 0
 
-    mylogger = SetupLogger("../Debug/mylogger.txt")
+    mylogger = SetupLogger("../Debug/mylogger.txt", outtoconsole=True)
 
     myconfig = CConfig()
     mycounter = myconfig.GetMyCounter()
     headless = myconfig.GetHeadlessMode()
-    print(f'headless = {headless}')
 
     mqtt_settings = myconfig.GetMQTT()
     mqtt_broker = mqtt_settings['broker']
