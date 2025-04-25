@@ -27,6 +27,8 @@ sudo apt install python3-lgpio
 
 https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi
 https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/using-neopixels-on-the-pi-5
+in venv, also pip install rpi-libcamera, but first sudo apt install libcamera-dev
+
 
 1_CreateDataset.py
 Performs basic augmentation on a series of original GOOD/BAD images.

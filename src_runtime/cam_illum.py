@@ -85,16 +85,16 @@ def init_camera():
     config = cam.create_still_configuration(
         main={"size": resolution, "format": "RGB888"},
         controls={          
-            "AwbEnable": False,
-            "AeEnable": False,
+            "AwbEnable": True,
+            "AeEnable": True,
             "AnalogueGain": 1.0,
             "Sharpness": sharpness,
             "ExposureTime": 10000,  # microseconds (helps reduce motion blur)
         }
     )
     cam.configure(config)
-    mylogger.info(f'cam info keys {cam.camera_ctrl_info.keys()}')
-    mylogger.info(f'cam sensor modes {cam.sensor_modes}')
+    #mylogger.info(f'cam info keys {cam.camera_ctrl_info.keys()}')
+    #mylogger.info(f'cam sensor modes {cam.sensor_modes}')
     #cam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 10.0})
     #cam.set_controls({"ScalerCrop": scaler_crop})
         

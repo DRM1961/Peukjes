@@ -10,7 +10,6 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import logging
 import torch
 
-from common import SetupLogger
 from common import mylogger
 from common import FeatureExtractor18, FeatureExtractor34, FeatureExtractor50,MLPClassifier, transform
 from common_vision import ProfileDirection, ProfileFeature
@@ -228,7 +227,7 @@ def IsFrameDifferent(imgV, refV):
 
     reject_count = 0
     reject_area = 0
-    result = img.copy()
+    result = imgV.copy()
     for c in Contours:
         mylogger.info(f'found contour {cv2.boundingRect(c)}')
         x,y,w,h = cv2.boundingRect(c)
@@ -288,6 +287,7 @@ def app(cam, servo, mqtt, feature_extactor, scaler, model):
                 do_analysis = False
         else:
             reject_count, reject_area, _ = IsFrameDifferent(run_img, ref_img)
+            if reject_count > 0:
             mylogger.info(f'diff count = {reject_count}, max area = {reject_area}')
             if reject_count > 0 and reject_area > detection_threshold['area_difference']:
                 do_analysis = True
@@ -358,7 +358,6 @@ if __name__ == '__main__':
     else:
         counter = 0
 
-    mylogger = SetupLogger("../Debug/mylogger.txt", outtoconsole=True)
 
     myconfig = CConfig()
     mycounter = myconfig.GetMyCounter()

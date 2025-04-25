@@ -11,7 +11,6 @@ import torchvision.models as models
 from PIL import Image
 import logging
 
-mylogger = None
 
 def SetupLogger(fn, outtoconsole=False):
     Logger = logging.getLogger("mylogger")
@@ -31,6 +30,11 @@ def SetupLogger(fn, outtoconsole=False):
         Logger.addHandler(console)        
     
     return(Logger)    
+
+mylogger = SetupLogger("../Debug/mylogger.txt", outtoconsole=True)
+
+
+
 
 class FeatureExtractor50(nn.Module):
     def __init__(self, base_model='resnet50'):

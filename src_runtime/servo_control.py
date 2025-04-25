@@ -1,5 +1,5 @@
 #Set up libraries and overall settings
-#import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library 
+import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library 
 # RPI 5 doesn't have GPIO library
 # pip uninstall RPi.GPIO 
 # and install lgpio instead
