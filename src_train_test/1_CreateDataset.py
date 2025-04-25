@@ -48,14 +48,19 @@ def align_images_method_ECC(reference, image):
 
     return cc, aligned_image
 
-def extract_object(reference, image):
+def extract_object(reference, image, fileindex):
     # Convert images to grayscale
     gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    _, _, red_ref = cv2.split(reference)
+    _, _, red_img = cv2.split(image)
+
+    gray_ref = red_ref.copy()
+    gray_img = red_img.copy()
 
     # Compute absolute difference
     diff = cv2.absdiff(gray_img, gray_ref)
-    cv2.imwrite('../Images/diff.png', diff)
+    cv2.imwrite(f'../Images/Diff/diff_{fileindex:03d}.png', diff)
     _, thresh = cv2.threshold(diff, 20, 128, cv2.THRESH_BINARY)
 
     # Find contours
@@ -139,6 +144,12 @@ PATH_BAD_INPUT_IMAGES = '../Images/Originals/GeenPeukjes'
 PATH_ROTATED_BAD_IMAGES = '../Images/Dataset'
 
 def main():
+
+    cwd = os.getcwd()
+    print(cwd)
+    if 'src_train_test' not in cwd:
+        os.chdir('src_train_test')    
+
     reference_img = cv2.imread(PATH_REFERENCE_IMAGE)
     href, wref = reference_img.shape[:2]
 
@@ -163,7 +174,7 @@ def main():
             print(f"ECC Score for {fileindex+1}:", confidence)
 
             if confidence > 0.1:
-                object_rgba, bbox = extract_object(reference_img, aligned_img)
+                object_rgba, bbox = extract_object(reference_img, aligned_img, fileindex)
                 todirfn = os.path.join(PATH_EXTRACT, f'{fromfn}_{fileindex+1:03d}_extract.png')
                 cv2.imwrite(todirfn, object_rgba)
 

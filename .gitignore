@@ -7,8 +7,10 @@ src_runtime_async/_avast_/*
 src_runtime_async/__pycache__/*
 Images/Dataset/*.png
 Images/Runtime/*.png
+Images/Diff/*.png
 Debug/*.*
 ProcessedImages/*.*
 env/*
+.env/*
 
 
