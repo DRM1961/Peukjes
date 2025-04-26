@@ -168,7 +168,7 @@ def main():
     cwd = os.getcwd()
     print(cwd)
     if 'src_train_test' not in cwd:
-        os.chdir('src_train_test')    
+        os.chdir('src_train_test')
 
     reference_img = cv2.imread(PATH_REFERENCE_IMAGE)
     href, wref = reference_img.shape[:2]
@@ -194,7 +194,7 @@ def main():
             confidence, aligned_img = align_images_method_ECC(reference_img, input_img)
             print(f"ECC Score for {fileindex+1}:", confidence)
 
-            if confidence > 0.1:
+            if confidence > 0.6:
                 object_rgba, bbox = extract_object(reference_img, aligned_img, empty_mask, fileindex)
                 todirfn = os.path.join(PATH_EXTRACT, f'{fromfn}_{fileindex+1:03d}_extract.png')
                 cv2.imwrite(todirfn, object_rgba)
